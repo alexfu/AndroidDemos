@@ -16,6 +16,10 @@ import android.view.Surface
 import android.widget.Button
 import java.io.File
 
+/**
+ * The actual screen recording work has been separated out into it's own class (Projector). This
+ * Activity just serves, mainly, as the UI component.
+ */
 class MainActivity : AppCompatActivity() {
     private lateinit var projector: Projector
     private val screenCaptureButton: Button by lazy { findViewById(R.id.screen_capture) as Button  }

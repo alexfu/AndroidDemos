@@ -8,6 +8,24 @@ import android.hardware.display.VirtualDisplay
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 
+/**
+ * This is where all of the screen recording work is done. Screen recording is done via
+ * MediaProjection#createVirtualDisplay, where the contents of the screen will be sent to a given
+ * Surface.
+ *
+ * Prior to calling MediaProjection#createVirtualDisplay, you need to obtain an instance of
+ * MediaProjection, which can be obtained from a MediaProjectionManager.
+ *
+ * Once you have a MediaProjectionManager, you must request permission to record the screen.
+ * This is done by calling MediaProjectionManager#createScreenCaptureIntent. The resulting Intent
+ * must be used to start an Activity for result (Activity#startActivityForResult).
+ *
+ * After you get the Activity result (from Activity#onActivityResult), you will use both resultCode
+ * and resultData to obtain an instance of MediaProjection. This is done by calling
+ * MediaProjectionManager#getMediaProjection.
+ *
+ * Now screen recording can be started by calling MediaProjection#createVirtualDisplay.
+ */
 class Projector(context: Context) {
     private val mediaProjectionManager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
     private val displayMetrics = context.resources.displayMetrics

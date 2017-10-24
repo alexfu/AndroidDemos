@@ -8,6 +8,40 @@ import android.util.Log
 import android.view.Surface
 import java.io.File
 
+/**
+ * This is where the screen recording gets saved as an MP4. The basic process for this is, taking
+ * the input (Surface) and sending it to a MediaCodec (for encoding) and then passing the resulting
+ * data to a MediaMuxer where the data will written to a file.
+ *
+ *    +-------+        +------------+        +------------+
+ *    + Input +  --->  + MediaCodec +  --->  + MediaMuxer +
+ *    +-------+        +------------+        +------------+
+ *
+ * The first thing we do is to prepare the encoder (MediaCodec) by giving it some parameters about
+ * our recording, such as width/height and MIME type and also setting up a callback for processing
+ * the resulting data. This is also where we initialize our MediaMuxer.
+ *
+ * Once the encoder is prepared and initialized
+ * (MediaCodec.createEncoderByType) we request a Surface from the encoder to use as input in place
+ * of buffers.
+ *
+ * +-------------------------------------------------------------------------+
+ * + NOTE: The Surface that we requested here, gets passed to our Projector. +
+ * +-------------------------------------------------------------------------+
+ *
+ * With the encoder ready to go, we can start the encoder by calling MediaCodec#start. From here,
+ * all we need to do it to respond to callback events from the codec.
+ *
+ * Whenever MediaCodec.Callback#onOutputFormatChanged is called, we add the new format to our
+ * MediaMuxer. This is also where we start the MediaMuxer. This method should only be triggered
+ * once.
+ *
+ * Whenever MediaCodec.Callback#onOutputBufferAvailable is called, we pass the output buffer to our
+ * MediaMuxer for writing (MediaMuxer#writeSampleData).
+ *
+ * We ignore MediaCodec.Callback#onInputBufferAvailable since our Projector will be the one filling
+ * the input buffer (Surface) with data.
+ */
 class ProjectorOutput(private val outputFile: File) {
     private var encoder: MediaCodec? = null
     private var muxer: MediaMuxer? = null
