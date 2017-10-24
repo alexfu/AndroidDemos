@@ -1,0 +1,2 @@
+# MediaProjectionDemo
+This demo shows how to implement a screen recorder using the [MediaProjection](https://developer.android.com/reference/android/media/projection/MediaProjection.html) API as well as saving it to a file using [MediaCodec](https://developer.android.com/reference/android/media/MediaCodec.html) and [MediaMuxer](https://developer.android.com/reference/android/media/MediaMuxer.html)
