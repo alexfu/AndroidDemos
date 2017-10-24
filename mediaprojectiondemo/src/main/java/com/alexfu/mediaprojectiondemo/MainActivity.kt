@@ -18,19 +18,12 @@ import java.io.File
 
 class MainActivity : AppCompatActivity() {
     private lateinit var projector: Projector
-    private lateinit var outputDir: File
-    private lateinit var screenCaptureButton: Button
+    private val screenCaptureButton: Button by lazy { findViewById(R.id.screen_capture) as Button  }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        outputDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES)
-
-        projector = Projector(this)
-        projector.output = ProjectorOutput(File(outputDir, "screen_record_${System.currentTimeMillis()}.mp4"))
-
-        screenCaptureButton = findViewById(R.id.screen_capture) as Button
+        setUpProjector()
         screenCaptureButton.setOnClickListener {
             toggleScreenCapture()
         }
@@ -73,5 +66,13 @@ class MainActivity : AppCompatActivity() {
     private fun stopScreenCapture() {
         screenCaptureButton.text = "Start recording"
         projector.stopScreenCapture()
+    }
+
+    private fun setUpProjector() {
+        val outputDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES)
+        val outputFile = File(outputDir, "screen_record_${System.currentTimeMillis()}.mp4")
+
+        projector = Projector(this)
+        projector.output = ProjectorOutput(outputFile)
     }
 }
