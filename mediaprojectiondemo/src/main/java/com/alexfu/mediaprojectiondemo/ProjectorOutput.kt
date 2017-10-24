@@ -4,7 +4,6 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
-import android.os.Handler
 import android.util.Log
 import android.view.Surface
 import java.io.File
@@ -13,10 +12,6 @@ class ProjectorOutput(private val outputFile: File) {
     private var encoder: MediaCodec? = null
     private var muxer: MediaMuxer? = null
     private var trackIndex: Int = -1
-    private val encodingHandler: Handler = Handler()
-    private val encodingRunnable: Runnable = Runnable {
-        encodingLoop()
-    }
 
     var surface: Surface? = null
     var width = 0
@@ -24,18 +19,15 @@ class ProjectorOutput(private val outputFile: File) {
 
     companion object {
         private val LOG_TAG = "ProjectorOutput"
-        private val ENCODE_TIMEOUT: Long = 100
         val MIME_TYPE = "video/avc"
     }
 
     fun start() {
         setUpEncoder()
         startEncoder()
-        startEncodingLoop()
     }
 
     fun stop() {
-        stopEncodingLoop()
         stopEncoder()
         cleanUpResources()
     }
@@ -49,13 +41,41 @@ class ProjectorOutput(private val outputFile: File) {
 
         val codec = MediaCodec.createEncoderByType(MIME_TYPE)
         codec.configure(videoFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+        codec.setCallback(object : MediaCodec.Callback() {
+            override fun onOutputBufferAvailable(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
+                val data = codec.getOutputBuffer(index)
+                if (info.size != 0) {
+                    muxer?.writeSampleData(trackIndex, data, info)
+                    Log.d(LOG_TAG, "Wrote ${info.size} bytes")
+                }
+                codec.releaseOutputBuffer(index, false)
+            }
+
+            override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {
+                // No op
+            }
+
+            override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
+                val newFormat = codec.outputFormat
+                muxer?.apply {
+                    trackIndex = this.addTrack(newFormat)
+                    this.start()
+                }
+            }
+
+            override fun onError(codec: MediaCodec, error: MediaCodec.CodecException) {
+                error.printStackTrace()
+            }
+        })
         surface = codec.createInputSurface()
+
+        muxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+
         encoder = codec
     }
 
     private fun startEncoder() {
         encoder?.start()
-        muxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
         trackIndex = -1
     }
 
@@ -72,68 +92,5 @@ class ProjectorOutput(private val outputFile: File) {
 
         muxer?.release()
         muxer = null
-    }
-
-    private fun startEncodingLoop() {
-        encodingHandler.post(encodingRunnable)
-    }
-
-    private fun stopEncodingLoop() {
-        encodingHandler.removeCallbacks(encodingRunnable)
-    }
-
-    private fun encodingLoop() {
-        try {
-            encoder?.apply {
-                val bufferInfo = MediaCodec.BufferInfo()
-                var outputBuffers = this.outputBuffers
-
-                while (true) {
-                    val encoderStatus = this.dequeueOutputBuffer(bufferInfo, 10000)
-                    when {
-                        encoderStatus == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                            Log.d(LOG_TAG, "Encoder status = INFO_TRY_AGAIN_LATER")
-                            return
-                        }
-                        encoderStatus == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED -> {
-                            Log.d(LOG_TAG, "Encoder status = INFO_OUTPUT_BUFFERS_CHANGED")
-                            outputBuffers = this.outputBuffers
-                        }
-                        encoderStatus == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                            Log.d(LOG_TAG, "Encoder status = INFO_OUTPUT_FORMAT_CHANGED")
-                            val newFormat = this.outputFormat
-                            muxer?.apply {
-                                trackIndex = this.addTrack(newFormat)
-                                this.start()
-                            }
-                        }
-                        encoderStatus < 0 -> {
-                            Log.d(LOG_TAG, "Encoder status = UNKNOWN ($encoderStatus)")
-                        }
-                        else -> {
-                            val data = outputBuffers[encoderStatus]
-                            if (bufferInfo.onlyContainsCodecConfig) {
-                                Log.d(LOG_TAG, "Encoder data only contains codec config data, skipping")
-                                bufferInfo.size = 0
-                            }
-
-                            if (bufferInfo.size != 0) {
-                                muxer?.writeSampleData(trackIndex, data, bufferInfo)
-                                Log.d(LOG_TAG, "Wrote ${bufferInfo.size} bytes")
-                            }
-
-                            this.releaseOutputBuffer(encoderStatus, false)
-
-                            if (bufferInfo.endOfStream) {
-                                Log.d(LOG_TAG, "End of stream")
-                                return
-                            }
-                        }
-                    }
-                }
-            }
-        } finally {
-            encodingHandler.postDelayed(encodingRunnable, ENCODE_TIMEOUT)
-        }
     }
 }
